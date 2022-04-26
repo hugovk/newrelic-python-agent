@@ -359,6 +359,8 @@ _settings.application_logging.forwarding = ApplicationLoggingForwardingSettings(
 _settings.application_logging.metrics = ApplicationLoggingMetricsSettings()
 _settings.application_logging.local_decorating = ApplicationLoggingLocalDecoratingSettings()
 _settings.attributes = AttributesSettings()
+_settings.application_logging = ApplicationLoggingSettings()
+_settings.application_logging.forwarding = ApplicationLoggingForwardingSettings()
 _settings.gc_runtime_metrics = GCRuntimeMetricsSettings()
 _settings.code_level_metrics = CodeLevelMetricsSettings()
 _settings.thread_profiler = ThreadProfilerSettings()
@@ -747,6 +749,10 @@ _settings.event_harvest_config.harvest_limits.span_event_data = _environ_as_int(
 
 _settings.event_harvest_config.harvest_limits.error_event_data = _environ_as_int(
     "NEW_RELIC_ERROR_COLLECTOR_MAX_EVENT_SAMPLES_STORED", ERROR_EVENT_RESERVOIR_SIZE
+)
+
+_settings.application_logging.forwarding.max_samples_stored = _environ_as_int(
+    "NEW_RELIC_APPLICATION_LOGGING_FORWARDING_MAX_SAMPLES_STORED`", LOG_EVENT_RESERVOIR_SIZE
 )
 
 _settings.console.listener_socket = None
