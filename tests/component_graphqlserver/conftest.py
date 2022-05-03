@@ -20,6 +20,7 @@ from testing_support.fixtures import (
 
 _coverage_source = [
     "newrelic.hooks.component_graphqlserver",
+    "newrelic.hooks.framework_graphql",
 ]
 
 code_coverage = code_coverage_fixture(source=_coverage_source)
