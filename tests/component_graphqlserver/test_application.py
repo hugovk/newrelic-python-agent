@@ -17,7 +17,7 @@ from framework_graphql.test_application import *
 
 EXTRA_SPANS = {
     "flask": 10,
-    "sanic": 2,
+    "sanic": 1,
 }
 
 @pytest.fixture(scope="session", params=["flask-sync", "sanic-sync", "sanic-async"])

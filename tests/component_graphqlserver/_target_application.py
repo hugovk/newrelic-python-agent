@@ -18,10 +18,17 @@ import json
 import webtest
 
 from testing_support.asgi_testing import AsgiTest
-from framework_graphql._target_schema_sync import target_schema as target_schema_sync
-from framework_graphql._target_schema_async import target_schema as target_schema_async
+from _target_schema_sync import target_schema as target_schema_sync
+from _target_schema_async import target_schema as target_schema_async
 from graphql_server.flask import GraphQLView as FlaskView
 from graphql_server.sanic import GraphQLView as SanicView
+
+
+def format_batch_query(query):
+    if isinstance(query, str):
+        return json.dumps({"query": query})
+    else:
+        return json.dumps([{"query": q} for q in query])
 
 
 def set_middlware(middleware, view_middleware):
@@ -39,27 +46,30 @@ sanic_names = ["GraphQLSync", "GraphQLAsync"]  # Not important but required
 def sanic_execute(schema, is_async=False):
     sanic_app = Sanic(sanic_names.pop())
     sanic_middleware = []
-    sanic_view = SanicView.as_view(schema=schema, middleware=sanic_middleware, enable_async=is_async)
+    sanic_view = SanicView.as_view(schema=schema, middleware=sanic_middleware, enable_async=is_async, batch=True)
     sanic_app.add_route(sanic_view, "/graphql")
     sanic_app = AsgiTest(sanic_app)
 
     def _sanic_execute(query, middleware=None):
         set_middlware(middleware, sanic_middleware)
         response = sanic_app.make_request(
-            "POST", "/graphql", body=json.dumps({"query": query}), headers={"Content-Type": "application/json"}
+            "POST", "/graphql", body=format_batch_query(query), headers={"Content-Type": "application/json"}
         )
         body = json.loads(response.body.decode("utf-8"))
 
-        if not isinstance(query, str) or "error" in query:
+        if not isinstance(query, (str, list)) or "error" in query:
             try:
                 assert response.status != 200, response
             except AssertionError:
-                assert body["errors"], body
+                assert "errors" in body, body
         else:
-            assert response.status == 200
+            assert response.status == 200, getattr(response, "body", response)
             assert "errors" not in body or not body["errors"], body
 
-        return body["data"]
+        if isinstance(body, list):
+            return body
+        else:
+            return body.get("data", {})
 
     return _sanic_execute
 
@@ -67,11 +77,11 @@ def sanic_execute(schema, is_async=False):
 def flask_execute(schema):
     flask_app = Flask("FlaskGraphQL")
     flask_middleware = []
-    flask_app.add_url_rule("/graphql", view_func=FlaskView.as_view("graphql", schema=schema, middleware=flask_middleware))
+    flask_app.add_url_rule("/graphql", view_func=FlaskView.as_view("graphql", schema=schema, middleware=flask_middleware, batch=True))
     flask_app = webtest.TestApp(flask_app)
 
     def _flask_execute(query, middleware=None):
-        if not isinstance(query, str) or "error" in query:
+        if not isinstance(query, (str, list)) or "error" in query:
             expect_errors = True
         else:
             expect_errors = False
@@ -79,7 +89,7 @@ def flask_execute(schema):
         set_middlware(middleware, flask_middleware)
         response = flask_app.post(
             "/graphql",
-            json.dumps({"query": query}),
+            format_batch_query(query),
             headers={"Content-Type": "application/json"},
             expect_errors=expect_errors,
         )
@@ -90,7 +100,10 @@ def flask_execute(schema):
         else:
             assert "errors" not in body or not body["errors"], body
 
-        return body["data"]
+        if isinstance(body, list):
+            return body
+        else:
+            return body.get("data", {})
 
     return _flask_execute
 

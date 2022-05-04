@@ -573,7 +573,7 @@ def test_ignored_introspection_transactions(target_application):
     framework, version, target_application, is_bg, schema_type, extra_spans = target_application
 
     @validate_transaction_count(0)
-    @background_task()
+    @conditional_decorator(background_task(), is_bg)
     def _test():
         response = target_application("{ __schema { types { name } } }")
 
