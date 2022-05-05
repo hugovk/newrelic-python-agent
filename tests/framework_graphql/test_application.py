@@ -94,26 +94,26 @@ _runtime_error_name = callable_name(RuntimeError)
 _test_runtime_error = [(_runtime_error_name, "Runtime Error!")]
 
 
-def _graphql_base_rollup_metrics(framework, version, background_task=True):
+def _graphql_base_rollup_metrics(framework, version, background_task=True, count=1):
     from graphql import __version__ as graphql_version
 
     metrics = [
         ("Python/Framework/GraphQL/%s" % graphql_version, 1),
-        ("GraphQL/all", 1),
-        ("GraphQL/%s/all" % framework, 1),
+        ("GraphQL/all", count),
+        ("GraphQL/%s/all" % framework, count),
     ]
     if background_task:
         metrics.extend(
             [
-                ("GraphQL/allOther", 1),
-                ("GraphQL/%s/allOther" % framework, 1),
+                ("GraphQL/allOther", count),
+                ("GraphQL/%s/allOther" % framework, count),
             ]
         )
     else:
         metrics.extend(
             [
-                ("GraphQL/allWeb", 1),
-                ("GraphQL/%s/allWeb" % framework, 1),
+                ("GraphQL/allWeb", count),
+                ("GraphQL/%s/allWeb" % framework, count),
             ]
         )
 
