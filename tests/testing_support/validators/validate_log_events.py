@@ -20,33 +20,28 @@ def validate_log_events(count=1):
     @function_wrapper
     def _validate_wrapper(wrapped, instance, args, kwargs):
 
-        record_log_event_called = []
+        record_called = []
         recorded_logs = []
 
-        def bind_log_event(record, message=None):
-            if message is None:
-                message = record.getMessage()
-            return record, message
-
-        @transient_function_wrapper("newrelic.core.stats_engine", "StatsEngine.record_log_event")
+        @transient_function_wrapper("newrelic.core.stats_engine", "StatsEngine.record_transaction")
         @catch_background_exceptions
         def _validate_log_events(wrapped, instance, args, kwargs):
-            record_log_event_called.append(True)
+            record_called.append(True)
             try:
                 result = wrapped(*args, **kwargs)
             except:
                 raise
             else:
-                recorded_logs.append(bind_log_event(*args, **kwargs))
+                recorded_logs.extend(list(instance._log_events))
 
             return result
 
         _new_wrapper = _validate_log_events(wrapped)
         val = _new_wrapper(*args, **kwargs)
-        assert record_log_event_called
+        assert record_called
         logs = recorded_logs.copy()
         
-        record_log_event_called[:] = []
+        record_called[:] = []
         recorded_logs[:] = []
 
         assert count == len(logs), logs

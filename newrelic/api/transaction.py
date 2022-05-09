@@ -25,13 +25,14 @@ import warnings
 import weakref
 from collections import OrderedDict
 
+from newrelic.api.application import application_instance
 import newrelic.core.database_node
 import newrelic.core.error_node
-from newrelic.core.log_node import LogNode
+from newrelic.core.log_event_node import LogEventNode
 import newrelic.core.root_node
 import newrelic.core.transaction_node
 import newrelic.packages.six as six
-from newrelic.api.time_trace import TimeTrace
+from newrelic.api.time_trace import TimeTrace, get_trace_linking_metadata
 from newrelic.common.encoding_utils import (
     DistributedTracePayload,
     NrTraceState,
@@ -58,7 +59,7 @@ from newrelic.core.attribute_filter import (
     DST_NONE,
     DST_TRANSACTION_TRACER,
 )
-from newrelic.core.config import DEFAULT_RESERVOIR_SIZE
+from newrelic.core.config import DEFAULT_RESERVOIR_SIZE, LOG_EVENT_RESERVOIR_SIZE
 from newrelic.core.custom_event import create_custom_event
 from newrelic.core.stack_trace import exception_stack
 from newrelic.core.stats_engine import CustomMetrics, SampledDataSet
@@ -211,6 +212,7 @@ class Transaction(object):
         self._errors = []
         self._slow_sql = []
         self._custom_events = SampledDataSet(capacity=DEFAULT_RESERVOIR_SIZE)
+        self._log_events = SampledDataSet(capacity=LOG_EVENT_RESERVOIR_SIZE)
 
         self._stack_trace_count = 0
         self._explain_plan_count = 0
@@ -568,6 +570,7 @@ class Transaction(object):
             errors=tuple(self._errors),
             slow_sql=tuple(self._slow_sql),
             custom_events=self._custom_events,
+            log_events=self._log_events,
             apdex_t=self.apdex,
             suppress_apdex=self.suppress_apdex,
             custom_metrics=self._custom_metrics,
@@ -1472,8 +1475,18 @@ class Transaction(object):
         self._name = name
 
 
-    def record_log_event(self, record, message=None):
-        self._application.record_log_event(record, message)
+    def record_log_event(self, message, level=None, timestamp=None):
+        timestamp = timestamp if timestamp is not None else time.time()
+        level = str(level) if level is not None else "UNKNOWN"
+
+        event = LogEventNode(
+            timestamp=timestamp,
+            level=level,
+            message=message,
+            attributes=get_trace_linking_metadata(),
+        )
+
+        self._log_events.add(event)
 
 
     def record_exception(self, exc=None, value=None, tb=None, params=None, ignore_errors=None):
@@ -1823,6 +1836,35 @@ def record_custom_event(event_type, params, application=None):
             )
     elif application.enabled:
         application.record_custom_event(event_type, params)
+
+
+def record_log_event(message, level=None, timestamp=None, application=None, priority=None):
+    """Record a log event.
+
+    Args:
+        record (logging.Record):
+        application (newrelic.api.Application): Application instance.
+    """
+
+    if application is None:
+        transaction = current_transaction()
+        if transaction:
+            transaction.record_log_event(message, level, timestamp)
+        else:
+            application = application_instance(activate=False)
+
+            if application and application.enabled:
+                application.record_log_event(message, level, timestamp, priority=priority)
+            else:
+                _logger.debug(
+                    "record_log_event has been called but no "
+                    "transaction or application was running. As a result, the following event "
+                    "has not been recorded. message: %r level: %r timestamp %r To correct this problem, supply "
+                    "an application object as a parameter to this record_log_event call.",
+                    message, level, timestamp,
+                )
+    elif application.enabled:
+        application.record_log_event(message, level, timestamp, priority=priority)
 
 
 def accept_distributed_trace_payload(payload, transport_type="HTTP"):

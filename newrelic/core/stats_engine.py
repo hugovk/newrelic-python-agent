@@ -32,6 +32,7 @@ from heapq import heapify, heapreplace
 
 import newrelic.packages.six as six
 from newrelic.api.settings import STRIP_EXCEPTION_MESSAGE
+from newrelic.api.time_trace import get_linking_metadata
 from newrelic.common.encoding_utils import json_encode
 from newrelic.common.object_names import parse_exc_info
 from newrelic.common.streaming_utils import StreamBuffer
@@ -44,7 +45,7 @@ from newrelic.core.error_collector import TracedError
 from newrelic.core.metric import TimeMetric
 from newrelic.core.stack_trace import exception_stack
 
-from newrelic.core.log_node import LogNode
+from newrelic.core.log_event_node import LogEventNode
 
 _logger = logging.getLogger(__name__)
 
@@ -334,9 +335,12 @@ class SampledDataSet(object):
                 return
             heapreplace(self.pq, entry)
 
-    def merge(self, other_data_set):
-        for priority, seen_at, sample in other_data_set.pq:
-            self.add(sample, priority)
+    def merge(self, other_data_set, priority=None):
+        if priority is None:
+            priority = -1
+
+        for original_priority, seen_at, sample in other_data_set.pq:
+            self.add(sample, max(priority, original_priority))
 
         # Merge the num_seen from the other_data_set, but take care not to
         # double-count the actual samples of other_data_set since the .add
@@ -1003,18 +1007,24 @@ class StatsEngine(object):
                 for event in transaction.span_events(self.__settings):
                     self._span_events.add(event, priority=transaction.priority)
 
+        # Merge in log events
 
-    def record_log_event(self, record, message=None):
-        if message is None:
-            message = record.getMessage()
+        if settings and settings.application_logging.enabled and settings.application_logging.forwarding.enabled:
+            self._log_events.merge(transaction.log_events, priority=transaction.priority)
 
-        event = LogNode(
-            timestamp=int(record.created * 1000),
-            log_level=record.levelname,
+
+    def record_log_event(self, message, level=None, timestamp=None, priority=None):
+        timestamp = timestamp if timestamp is not None else time.time()
+        level = str(level) if level is not None else "UNKNOWN"
+
+        event = LogEventNode(
+            timestamp=timestamp,
+            level=level,
             message=message,
+            attributes=get_trace_linking_metadata(),
         )
 
-        self._log_events.add(event)
+        self._log_events.add(event, priority=priority)
 
 
     def metric_data(self, normalizer=None):

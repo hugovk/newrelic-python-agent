@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from newrelic.api.time_trace import get_linking_metadata
 from newrelic.common.object_wrapper import wrap_function_wrapper
 
 def is_null_handlers(handler):
@@ -20,6 +21,26 @@ def is_null_handlers(handler):
 
 def bind_callHandlers(record):
     return record
+
+
+def bind_emit(record):
+    return record
+
+
+def add_nr_linking_metadata(message):
+    available_metadata = get_linking_metadata()
+    # entity_name = encoded(available_metadata["entity.name"]) if available_metadata["entity.name"] else " "
+    # entity_guid = available_metadata["entity.guid"] if available_metadata["entity.guid"] else " "
+    # span_id = available_metadata["span.id"] if available_metadata["span.id"] else " "
+    # trace_id = available_metadata["trace.id"] if available_metadata["trace.id"] else " "
+    # hostname = settings.host
+
+    # nr_formatted_message = message + " NR-LINKING | " + entity_guid +  hostname + trace_id + span_id + entity_name
+    # {entity.guid} | {hostname} | {trace.id} | {span.id} | {entity.name} |
+
+
+def wrap_emit(wrapped, instance, args, kwargs):
+    return wrapped(*args, **kwargs)
 
 
 def wrap_callHandlers(wrapped, instance, args, kwargs):
@@ -49,7 +70,16 @@ def wrap_handlers(logger):
         wrap_handlers(logger.parent)
 
 
+
 def instrument_cpython_Lib_logging_init(module):
     if hasattr(module, "Logger"):
         if hasattr(module.Logger, "callHandlers"):
             wrap_function_wrapper(module, "Logger.callHandlers", wrap_callHandlers)
+
+    if hasattr(module, "StreamHandler"):
+        if hasattr(module.Logger, "emit"):
+            wrap_function_wrapper(module, "StreamHandler.emit", wrap_emit)
+
+    if hasattr(module, "Handler"):
+        if hasattr(module.Logger, "emit"):
+            wrap_function_wrapper(module, "StreamHandler.emit", wrap_emit)

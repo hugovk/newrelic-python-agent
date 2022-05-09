@@ -86,9 +86,9 @@ class NewRelicContextFormatter(Formatter):
 
 
 class NewRelicLogForwardingHandler(logging.Handler):
-    def __init__(self, *args, **kwargs):
-        super(NewRelicLogForwardingHandler, self).__init__(*args, **kwargs)
-        self.setFormatter(NewRelicContextFormatter())
+    # def __init__(self, *args, **kwargs):
+    #     super(NewRelicLogForwardingHandler, self).__init__(*args, **kwargs)
+    #     self.setFormatter(NewRelicContextFormatter())
 
     @property
     def settings(self):
@@ -99,12 +99,13 @@ class NewRelicLogForwardingHandler(logging.Handler):
 
     def emit(self, record):
         try:
-            message = self.format(record)
+            event = (record.getMessage(), record.levelname, int(record.created * 1000))
             txn = current_transaction()
             if txn:
-                txn.record_log_event(record, message)
+                txn.record_log_event(*event)
             else:
                 # TODO Send directly to application somehow
+                #record_log_event(record)
                 pass
         except Exception:
             self.handleError(record)

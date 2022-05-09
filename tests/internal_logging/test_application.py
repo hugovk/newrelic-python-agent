@@ -20,23 +20,29 @@ from newrelic.api.background_task import background_task
 from newrelic.api.transaction import _log_records
 from testing_support.validators.validate_log_events import validate_log_events
 
+try:
+    from io import StringIO
+except ImportError:
+    from io import BytesIO as StringIO
+    
+
 @pytest.fixture()
 def logger():
     _logger = logging.getLogger("my_app")
     _logger.addHandler(logging.StreamHandler(stream=sys.stdout))
     return _logger
 
-@background_task()
-def test_no_harm(caplog, logger):
-    with caplog.at_level(logging.INFO):
-        logger.info("hi")
+# @background_task()
+# def test_no_harm(logger):
+#     with caplog.at_level(logging.INFO):
+#         logger.info("hi")
 
-    assert len(caplog.records) == 1
-    assert caplog.messages == ["hi"]
-    caplog.clear()
+#     assert len(caplog.records) == 1
+#     assert caplog.messages == ["hi"]
+#     caplog.clear()
 
-    record, message = _log_records.pop()
-    assert "hi" in message
+#     record, message = _log_records.pop()
+#     assert "hi" in message
 
 
 @validate_log_events(1)

@@ -836,7 +836,7 @@ class Application(object):
                 self._global_events_account += 1
                 self._stats_engine.record_custom_event(event)
 
-    def record_log_event(self, record, message=None):
+    def record_log_event(self, message, level=None, timestamp=None, priority=None):
         if not self._active_session:
             return
 
@@ -850,7 +850,7 @@ class Application(object):
         if record:
             with self._stats_custom_lock:
                 self._global_events_account += 1
-                self._stats_engine.record_log_event(record, message)
+                self._stats_engine.record_log_event(message, level, timestamp, priority=priority)
 
     def record_transaction(self, data):
         """Record a single transaction against this application."""
@@ -1304,6 +1304,28 @@ class Application(object):
                             internal_count_metric("Supportability/Events/Customer/Sent", customs.num_samples)
 
                             stats.reset_custom_events()
+
+                    # Send log events
+
+                    if configuration and configuration.application_logging.enabled and configuration.application_logging.forwarding.enabled:
+
+                        logs = stats.log_events
+
+                        if logs:
+                            if logs.num_samples > 0:
+                                log_samples = list(logs)
+
+                                _logger.debug("Sending log event data for harvest of %r.", self._app_name)
+
+                                self._active_session.send_log_events(logs.sampling_info, log_samples)
+                                log_samples = None
+
+                            # As per spec
+                            # TODO Send logging and severity line counts
+                            # internal_count_metric("Supportability/Logging/Forwarding/Seen", log.num_seen)
+                            # internal_count_metric("Supportability/Logging/Forwarding/Sent", log.num_samples)
+
+                            stats.reset_log_events()
 
                     # Send the accumulated error data.
 

@@ -131,6 +131,16 @@ class Session(object):
     def send_log_events(self, sampling_info, log_event_data):
         """Called to submit sample set for log events."""
 
+        from newrelic.api.time_trace import get_service_linking_metadata
+
+        common = get_service_linking_metadata()
+        common.pop("entity.type", None)
+        log_event_data = [log._asdict() for log in log_event_data]
+        for log in log_event_data:
+            log.update(log.pop("attributes"))
+
+        data = [{"common": {"attributes": common}, "logs": log_event_data}]
+
         payload = (self.agent_run_id, sampling_info, log_event_data)
         return self._protocol.send("log_event_data", payload)
 

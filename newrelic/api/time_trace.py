@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import platform
 import random
 import sys
 import time
@@ -574,20 +575,21 @@ class TimeTrace(object):
         else:
             self.has_async_children = False
 
-    def get_linking_metadata(self):
-        metadata = {
-            "entity.type": "SERVICE",
-        }
+    def _get_service_linking_metadata(self):
+        return get_service_linking_metadata()
+
+    def _get_trace_linking_metadata(self):
+        metadata = {}
         txn = self.transaction
         if txn:
             metadata["span.id"] = self.guid
             metadata["trace.id"] = txn.trace_id
-            settings = txn.settings
-            if settings:
-                metadata["entity.name"] = settings.app_name
-                entity_guid = settings.entity_guid
-                if entity_guid:
-                    metadata["entity.guid"] = entity_guid
+
+        return metadata
+
+    def get_linking_metadata(self):
+        metadata = self._get_service_linking_metadata()
+        metadata.update(self._get_trace_linking_metadata())
         return metadata
 
 
@@ -601,14 +603,44 @@ def current_trace():
     return trace_cache().current_trace()
 
 
-def get_linking_metadata():
+def get_trace_linking_metadata():
     trace = current_trace()
     if trace:
-        return trace.get_linking_metadata()
+        return trace._get_trace_linking_metadata()
     else:
-        return {
-            "entity.type": "SERVICE",
-        }
+        return {}
+
+
+def get_service_linking_metadata():
+    metadata = {
+        "entity.type": "SERVICE",
+    }
+    trace = current_trace()
+    settings = None
+    if trace:
+        txn = trace.transaction
+        if txn:
+            settings = txn.settings
+
+    if not settings:
+        from newrelic.api.application import application_instance
+        settings = application_instance(activate=False).settings
+
+    if settings:
+        metadata["entity.name"] = settings.app_name
+        entity_guid = settings.entity_guid
+        if entity_guid:
+            metadata["entity.guid"] = entity_guid
+        metadata["hostname"] = platform.uname().node
+    return metadata
+
+
+def get_linking_metadata():
+    metadata = get_service_linking_metadata()
+    trace = current_trace()
+    if trace:
+        metadata.update(trace._get_trace_linking_metadata())
+    return metadata
 
 
 def record_exception(exc=None, value=None, tb=None, params=None, ignore_errors=None, application=None):
