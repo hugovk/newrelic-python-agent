@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools
 import sys
 from inspect import isawaitable
 
@@ -26,13 +25,15 @@ from newrelic.hooks.framework_graphql import (
     framework_version as graphql_framework_version,
 )
 from newrelic.hooks.framework_graphql import ignore_graphql_duplicate_exception
+from newrelic.hooks.framework_graphql_py3 import nr_coro_graphql_impl_wrapper
+
 
 def framework_details():
     import graphql_server
     return ("GraphQLServer", getattr(graphql_server, "__version__", None))
 
-def bind_query(schema, params, *args, **kwargs):
-    return getattr(params, "query", None)
+def bind_get_response(schema, params, *args, **kwargs):
+    return schema, getattr(params, "query", None)
 
 
 def wrap_get_response(wrapped, instance, args, kwargs):
@@ -42,7 +43,7 @@ def wrap_get_response(wrapped, instance, args, kwargs):
         return wrapped(*args, **kwargs)
 
     try:
-        query = bind_query(*args, **kwargs)
+        schema, query = bind_get_response(*args, **kwargs)
     except TypeError:
         return wrapped(*args, **kwargs)
 
@@ -59,6 +60,12 @@ def wrap_get_response(wrapped, instance, args, kwargs):
     trace.product = "GraphQLServer"
     trace.statement = graphql_statement(query)
 
+    # Handle Schemas created from frameworks
+    if hasattr(schema, "_nr_framework"):
+        framework = schema._nr_framework
+        trace.product = framework[0]
+        transaction.add_framework_info(name=framework[0], version=framework[1])
+
     # Trace must be manually started and stopped to ensure it exists prior to and during the entire duration of the query.
     # Otherwise subsequent instrumentation will not be able to find an operation trace and will have issues.
     trace.__enter__()
@@ -73,22 +80,11 @@ def wrap_get_response(wrapped, instance, args, kwargs):
         if isawaitable(result):
             # Asynchronous implementations
             # Return a coroutine that handles closing the operation trace
-            from newrelic.hooks.framework_graphql_py3 import nr_coro_graphql_impl_wrapper
             return nr_coro_graphql_impl_wrapper(wrapped, trace, ignore_graphql_duplicate_exception, result)
         else:
             # Execution finished synchronously, exit immediately.
             trace.__exit__(None, None, None)
             return result
-
-
-def nr_coro_get_response_wrapper(wrapped, trace, ignore, result):
-    @functools.wraps(wrapped)
-    async def _nr_coro_get_response_wrapper():
-        with trace:
-            with ErrorTrace(ignore=ignore):
-                return await result
-
-    return _nr_coro_get_response_wrapper()
 
 
 def instrument_graphqlserver(module):
