@@ -25,7 +25,7 @@ EXTRA_SPANS = {
 @pytest.fixture(scope="session", params=["flask-sync", "sanic-sync", "sanic-async"])
 def target_application(request):
     import graphql_server
-    from _target_application import target_application
+    from ._target_application import target_application
     target_application = target_application[request.param]
 
     version = graphql_server.__version__
@@ -73,8 +73,8 @@ def test_batch_query(target_application):
         "graphql.field.returnType": "String",
     }
 
-    @validate_code_level_metrics("_target_schema_%s" % schema_type, "resolve_echo")
-    @validate_code_level_metrics("_target_schema_%s" % schema_type, "resolve_hello")
+    @validate_code_level_metrics("component_graphqlserver._target_schema_%s" % schema_type, "resolve_echo")
+    @validate_code_level_metrics("component_graphqlserver._target_schema_%s" % schema_type, "resolve_hello")
     @validate_span_events(exact_agents=_expected_second_query_operation_attributes)
     @validate_span_events(exact_agents=_expected_second_query_resolver_attributes)
     @validate_span_events(exact_agents=_expected_first_query_operation_attributes)

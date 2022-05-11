@@ -18,8 +18,8 @@ import json
 import webtest
 
 from testing_support.asgi_testing import AsgiTest
-from _target_schema_sync import target_schema as target_schema_sync
-from _target_schema_async import target_schema as target_schema_async
+from ._target_schema_sync import target_schema as target_schema_sync
+from ._target_schema_async import target_schema as target_schema_async
 from graphql_server.flask import GraphQLView as FlaskView
 from graphql_server.sanic import GraphQLView as SanicView
 

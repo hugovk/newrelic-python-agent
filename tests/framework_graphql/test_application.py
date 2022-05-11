@@ -68,6 +68,14 @@ def to_graphql_source(query):
     return delay_import
 
 
+def code_level_metrics_namespace(framework, schema_type):
+    framework = framework.lower()
+    if framework == "graphqlserver":
+        return "component_%s._target_schema_%s" % (framework, schema_type)
+    else:
+        return "framework_%s._target_schema_%s" % (framework, schema_type)
+
+
 def example_middleware(next, root, info, **args):
     return_value = next(root, info, **args)
     return return_value
@@ -178,7 +186,7 @@ def test_query_and_mutation(target_application, is_graphql_2):
         "graphql.field.returnType": "[String%s]%s" % (type_annotation, type_annotation),
     }
 
-    @validate_code_level_metrics("framework_%s._target_schema_%s" % (framework.lower(), schema_type), "resolve_storage_add")
+    @validate_code_level_metrics(code_level_metrics_namespace(framework, schema_type), "resolve_storage_add")
     @validate_span_events(exact_agents=_expected_mutation_operation_attributes)
     @validate_span_events(exact_agents=_expected_mutation_resolver_attributes)
     @validate_transaction_metrics(
@@ -197,7 +205,7 @@ def test_query_and_mutation(target_application, is_graphql_2):
         response = target_application(query)
         assert response["storage_add"] == "abc" or response["storage_add"]["string"] == "abc"
 
-    @validate_code_level_metrics("framework_%s._target_schema_%s" % (framework.lower(), schema_type), "resolve_storage")
+    @validate_code_level_metrics(code_level_metrics_namespace(framework, schema_type), "resolve_storage")
     @validate_span_events(exact_agents=_expected_query_operation_attributes)
     @validate_span_events(exact_agents=_expected_query_resolver_attributes)
     @validate_transaction_metrics(
@@ -236,7 +244,7 @@ def test_middleware(target_application, middleware):
     span_count = 5 + extra_spans
 
     @validate_code_level_metrics(*name.split(":"))
-    @validate_code_level_metrics("framework_%s._target_schema_%s" % (framework.lower(), schema_type), "resolve_hello")
+    @validate_code_level_metrics(code_level_metrics_namespace(framework, schema_type), "resolve_hello")
     @validate_span_events(count=span_count)
     @validate_transaction_metrics(
         "query/<anonymous>/hello",
@@ -313,7 +321,7 @@ def test_exception_in_resolver(target_application, field):
     framework, version, target_application, is_bg, schema_type, extra_spans = target_application
     query = "query MyQuery { %s }" % field
 
-    txn_name = "framework_%s._target_schema_%s:resolve_error" % (framework.lower(), schema_type)
+    txn_name = "%s:resolve_error" % code_level_metrics_namespace(framework, schema_type)
 
     # Metrics
     _test_exception_scoped_metrics = [
@@ -553,7 +561,7 @@ _test_queries = [
 def test_deepest_unique_path(target_application, query, expected_path):
     framework, version, target_application, is_bg, schema_type, extra_spans = target_application
     if expected_path == "/error":
-        txn_name = "framework_%s._target_schema_%s:resolve_error" % (framework.lower(), schema_type)
+        txn_name = "%s:resolve_error" % code_level_metrics_namespace(framework, schema_type)
     else:
         txn_name = "query/<anonymous>%s" % expected_path
 
