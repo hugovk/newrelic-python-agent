@@ -12,13 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from framework_graphql.test_application import *
+import pytest
 
+from framework_graphql.test_application import *
 
 @pytest.fixture(scope="session", params=["sync-sync", "async-sync", "async-async"])
 def target_application(request):
     from _target_application import target_application
     target_application = target_application[request.param]
+
+@pytest.fixture(scope="session", params=["sync-sync", "async-sync", "async-async", "sync-promise", "async-promise"])
+def target_application(request):
+    from ._target_application import target_application
+
+    target_application = target_application.get(request.param, None)
+    if target_application is None:
+        pytest.skip("Unsupported combination.")
+        return
 
     try:
         import graphene
