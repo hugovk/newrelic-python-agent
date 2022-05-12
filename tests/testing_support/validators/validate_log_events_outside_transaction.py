@@ -18,16 +18,16 @@ from newrelic.common.object_wrapper import (transient_function_wrapper,
         function_wrapper)
 from testing_support.fixtures import catch_background_exceptions
 
-def validate_log_events(events):
+def validate_log_events_outside_transaction(events):
     @function_wrapper
     def _validate_wrapper(wrapped, instance, args, kwargs):
 
         record_called = []
         recorded_logs = []
 
-        @transient_function_wrapper("newrelic.core.stats_engine", "StatsEngine.record_transaction")
+        @transient_function_wrapper("newrelic.core.stats_engine", "StatsEngine.record_log_event")
         @catch_background_exceptions
-        def _validate_log_events(wrapped, instance, args, kwargs):
+        def _validate_log_events_outside_transaction(wrapped, instance, args, kwargs):
             record_called.append(True)
             try:
                 result = wrapped(*args, **kwargs)
@@ -40,7 +40,7 @@ def validate_log_events(events):
             return result
 
 
-        _new_wrapper = _validate_log_events(wrapped)
+        _new_wrapper = _validate_log_events_outside_transaction(wrapped)
         val = _new_wrapper(*args, **kwargs)
         assert record_called
         logs = recorded_logs.copy()

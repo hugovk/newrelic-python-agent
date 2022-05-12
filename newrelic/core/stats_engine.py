@@ -36,7 +36,7 @@ from newrelic.api.time_trace import get_linking_metadata
 from newrelic.common.encoding_utils import json_encode
 from newrelic.common.object_names import parse_exc_info
 from newrelic.common.streaming_utils import StreamBuffer
-from newrelic.core.attribute import create_user_attributes, process_user_attribute
+from newrelic.core.attribute import create_user_attributes, process_user_attribute, truncate, MAX_LOG_MESSAGE_LENGTH
 from newrelic.core.attribute_filter import DST_ERROR_COLLECTOR
 from newrelic.core.code_level_metrics import extract_code_from_traceback
 from newrelic.core.config import is_expected_error, should_ignore_error
@@ -44,6 +44,7 @@ from newrelic.core.database_utils import explain_plan
 from newrelic.core.error_collector import TracedError
 from newrelic.core.metric import TimeMetric
 from newrelic.core.stack_trace import exception_stack
+from newrelic.api.time_trace import TimeTrace, get_trace_linking_metadata
 
 from newrelic.core.log_event_node import LogEventNode
 
@@ -198,6 +199,9 @@ class CustomMetrics(object):
         from prior value metrics with the same name.
 
         """
+        # if "Logging/li" in name:
+        #     breakpoint()
+        #     pass
         if isinstance(value, dict):
             if len(value) == 1 and "count" in value:
                 new_stats = CountStats(call_count=value["count"])
@@ -1017,12 +1021,23 @@ class StatsEngine(object):
         timestamp = timestamp if timestamp is not None else time.time()
         level = str(level) if level is not None else "UNKNOWN"
 
+        if not message:
+            _logger.debug("record_log_event called where message was missing. No log event will be sent.")
+            return
+        
+        message = truncate(message, MAX_LOG_MESSAGE_LENGTH)
+
         event = LogEventNode(
             timestamp=timestamp,
             level=level,
             message=message,
-            attributes=get_trace_linking_metadata(),
+            attributes=get_linking_metadata(), 
         )
+
+        if priority is None:
+            # Base priority for log events outside transactions is below those inside transactions
+            priority = random.random() - 1
+
 
         self._log_events.add(event, priority=priority)
 

@@ -18,7 +18,7 @@ import re
 from logging import Formatter, LogRecord
 
 from newrelic.api.time_trace import get_linking_metadata
-from newrelic.api.transaction import current_transaction
+from newrelic.api.transaction import current_transaction, record_log_event
 from newrelic.common import agent_http
 from newrelic.common.object_names import parse_exc_info
 from newrelic.core.attribute import truncate
@@ -86,10 +86,6 @@ class NewRelicContextFormatter(Formatter):
 
 
 class NewRelicLogForwardingHandler(logging.Handler):
-    # def __init__(self, *args, **kwargs):
-    #     super(NewRelicLogForwardingHandler, self).__init__(*args, **kwargs)
-    #     self.setFormatter(NewRelicContextFormatter())
-
     @property
     def settings(self):
         transaction = current_transaction()
@@ -99,14 +95,13 @@ class NewRelicLogForwardingHandler(logging.Handler):
 
     def emit(self, record):
         try:
-            event = (record.getMessage(), record.levelname, int(record.created * 1000))
-            txn = current_transaction()
-            if txn:
-                txn.record_log_event(*event)
+            # Avoid getting local log decorated message
+            if hasattr(record, "_nr_original_message"):
+                message = record._nr_original_message()
             else:
-                # TODO Send directly to application somehow
-                #record_log_event(record)
-                pass
+                message = record.getMessage()
+
+            record_log_event(message, record.levelname, int(record.created * 1000))
         except Exception:
             self.handleError(record)
 

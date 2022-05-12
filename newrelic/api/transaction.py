@@ -32,7 +32,7 @@ from newrelic.core.log_event_node import LogEventNode
 import newrelic.core.root_node
 import newrelic.core.transaction_node
 import newrelic.packages.six as six
-from newrelic.api.time_trace import TimeTrace, get_trace_linking_metadata
+from newrelic.api.time_trace import TimeTrace, get_linking_metadata
 from newrelic.common.encoding_utils import (
     DistributedTracePayload,
     NrTraceState,
@@ -48,11 +48,13 @@ from newrelic.common.encoding_utils import (
     obfuscate,
 )
 from newrelic.core.attribute import (
+    MAX_LOG_MESSAGE_LENGTH,
     MAX_NUM_USER_ATTRIBUTES,
     create_agent_attributes,
     create_attributes,
     create_user_attributes,
     process_user_attribute,
+    truncate,
 )
 from newrelic.core.attribute_filter import (
     DST_ERROR_COLLECTOR,
@@ -211,8 +213,6 @@ class Transaction(object):
 
         self._errors = []
         self._slow_sql = []
-        self._custom_events = SampledDataSet(capacity=DEFAULT_RESERVOIR_SIZE)
-        self._log_events = SampledDataSet(capacity=LOG_EVENT_RESERVOIR_SIZE)
 
         self._stack_trace_count = 0
         self._explain_plan_count = 0
@@ -327,6 +327,13 @@ class Transaction(object):
 
                 if self._settings:
                     self.enabled = True
+
+        if self._settings:
+            self._custom_events = SampledDataSet(capacity=self._settings.event_harvest_config.harvest_limits.custom_event_data)
+            self._log_events = SampledDataSet(capacity=self._settings.application_logging.forwarding.max_samples_stored)
+        else:
+            self._custom_events = SampledDataSet(capacity=DEFAULT_RESERVOIR_SIZE)
+            self._log_events = SampledDataSet(capacity=LOG_EVENT_RESERVOIR_SIZE)
 
     def __del__(self):
         self._dead = True
@@ -1479,14 +1486,38 @@ class Transaction(object):
         timestamp = timestamp if timestamp is not None else time.time()
         level = str(level) if level is not None else "UNKNOWN"
 
+        if not message:
+            _logger.debug("record_log_event called where message was missing. No log event will be sent.")
+            return
+
         event = LogEventNode(
             timestamp=timestamp,
             level=level,
             message=message,
-            attributes=get_trace_linking_metadata(),
+            attributes=get_linking_metadata(),
         )
 
         self._log_events.add(event)
+
+
+    def record_log_event(self, message, level=None, timestamp=None, priority=None):
+        timestamp = timestamp if timestamp is not None else time.time()
+        level = str(level) if level is not None else "UNKNOWN"
+        
+        if not message:
+            _logger.debug("record_log_event called where message was missing. No log event will be sent.")
+            return
+        
+        message = truncate(message, MAX_LOG_MESSAGE_LENGTH)
+
+        event = LogEventNode(
+            timestamp=timestamp,
+            level=level,
+            message=message,
+            attributes=get_linking_metadata(), 
+        )
+
+        self._log_events.add(event, priority=priority)
 
 
     def record_exception(self, exc=None, value=None, tb=None, params=None, ignore_errors=None):
@@ -1857,10 +1888,9 @@ def record_log_event(message, level=None, timestamp=None, application=None, prio
                 application.record_log_event(message, level, timestamp, priority=priority)
             else:
                 _logger.debug(
-                    "record_log_event has been called but no "
-                    "transaction or application was running. As a result, the following event "
-                    "has not been recorded. message: %r level: %r timestamp %r To correct this problem, supply "
-                    "an application object as a parameter to this record_log_event call.",
+                    "record_log_event has been called but no transaction or application was running. As a result, "
+                    "the following event has not been recorded. message: %r level: %r timestamp %r. To correct "
+                    "this problem, supply an application object as a parameter to this record_log_event call.",
                     message, level, timestamp,
                 )
     elif application.enabled:

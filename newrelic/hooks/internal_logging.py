@@ -12,8 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from newrelic.api.application import application_instance
 from newrelic.api.time_trace import get_linking_metadata
+from newrelic.api.transaction import current_transaction
 from newrelic.common.object_wrapper import wrap_function_wrapper
+from newrelic.core.config import global_settings
+
+try:
+    from urllib import urlencode
+except ImportError:
+    from urllib.parse import urlencode
 
 def is_null_handlers(handler):
     from logging.handlers import NullHandler
@@ -29,26 +37,50 @@ def bind_emit(record):
 
 def add_nr_linking_metadata(message):
     available_metadata = get_linking_metadata()
-    # entity_name = encoded(available_metadata["entity.name"]) if available_metadata["entity.name"] else " "
-    # entity_guid = available_metadata["entity.guid"] if available_metadata["entity.guid"] else " "
-    # span_id = available_metadata["span.id"] if available_metadata["span.id"] else " "
-    # trace_id = available_metadata["trace.id"] if available_metadata["trace.id"] else " "
-    # hostname = settings.host
+    entity_name = urlencode(available_metadata.get("entity.name", "")) 
+    entity_guid = available_metadata.get("entity.guid", "") 
+    span_id = available_metadata.get("span.id", "")
+    trace_id = available_metadata.get("trace.id", "")
+    hostname = available_metadata.get("hostname", "")
 
-    # nr_formatted_message = message + " NR-LINKING | " + entity_guid +  hostname + trace_id + span_id + entity_name
-    # {entity.guid} | {hostname} | {trace.id} | {span.id} | {entity.name} |
-
+    nr_linking_str = "|".join(("NR-LINKING", entity_guid, hostname, trace_id, span_id, entity_name))
+    return "%s %s|" % (message, nr_linking_str)
 
 def wrap_emit(wrapped, instance, args, kwargs):
     return wrapped(*args, **kwargs)
 
 
+def wrap_getMessage(wrapped, instance, args, kwargs):
+    message = wrapped(*args, **kwargs)
+    return add_nr_linking_metadata(message)
+
+
 def wrap_callHandlers(wrapped, instance, args, kwargs):
+    transaction = current_transaction()
     record = bind_callHandlers(*args, **kwargs)
 
     logger_name = getattr(instance, "name", None)
     if logger_name and logger_name.split(".")[0] == "newrelic":
         return wrapped(*args, **kwargs)
+
+    if transaction:
+        settings = transaction.settings
+    else:
+        settings = global_settings()
+
+    if settings and settings.application_logging and settings.application_logging.enabled and settings.application_logging.metrics.enabled:
+        level_name = str(getattr(record, "levelname", "UNKNOWN"))
+        if transaction:
+            transaction.record_custom_metric("Logging/lines", {"count": 1})
+            transaction.record_custom_metric("Logging/lines/%s" % level_name, {"count": 1})
+        else:
+            application = application_instance(activate=False)
+            if application and application.enabled:
+                application.record_custom_metric("Logging/lines", {"count": 1})
+                application.record_custom_metric("Logging/lines/%s" % level_name, {"count": 1})
+    
+    if settings and settings.application_logging and settings.application_logging.enabled and settings.application_logging.local_decorating.enabled:
+        record._nr_original_message = record.getMessage
 
     wrap_handlers(instance)
 

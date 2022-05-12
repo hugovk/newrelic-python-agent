@@ -575,8 +575,8 @@ class TimeTrace(object):
         else:
             self.has_async_children = False
 
-    def _get_service_linking_metadata(self):
-        return get_service_linking_metadata()
+    def _get_service_linking_metadata(self, application=None):
+        return get_service_linking_metadata(application)
 
     def _get_trace_linking_metadata(self):
         metadata = {}
@@ -587,8 +587,8 @@ class TimeTrace(object):
 
         return metadata
 
-    def get_linking_metadata(self):
-        metadata = self._get_service_linking_metadata()
+    def get_linking_metadata(self, application=None):
+        metadata = self._get_service_linking_metadata(application)
         metadata.update(self._get_trace_linking_metadata())
         return metadata
 
@@ -611,10 +611,11 @@ def get_trace_linking_metadata():
         return {}
 
 
-def get_service_linking_metadata():
+def get_service_linking_metadata(application=None):
     metadata = {
         "entity.type": "SERVICE",
     }
+
     trace = current_trace()
     settings = None
     if trace:
@@ -623,8 +624,11 @@ def get_service_linking_metadata():
             settings = txn.settings
 
     if not settings:
-        from newrelic.api.application import application_instance
-        settings = application_instance(activate=False).settings
+        if application is None:
+            from newrelic.api.application import application_instance
+            settings = application_instance(activate=False).settings
+        else:
+            settings = application.settings
 
     if settings:
         metadata["entity.name"] = settings.app_name
@@ -632,10 +636,11 @@ def get_service_linking_metadata():
         if entity_guid:
             metadata["entity.guid"] = entity_guid
         metadata["hostname"] = platform.uname().node
+
     return metadata
 
 
-def get_linking_metadata():
+def get_linking_metadata(application=None):
     metadata = get_service_linking_metadata()
     trace = current_trace()
     if trace:

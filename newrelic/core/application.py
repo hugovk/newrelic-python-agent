@@ -847,7 +847,7 @@ class Application(object):
             # if settings is None or not settings.application_logging.enabled:
             return
 
-        if record:
+        if message:
             with self._stats_custom_lock:
                 self._global_events_account += 1
                 self._stats_engine.record_log_event(message, level, timestamp, priority=priority)
@@ -1321,9 +1321,9 @@ class Application(object):
                                 log_samples = None
 
                             # As per spec
-                            # TODO Send logging and severity line counts
-                            # internal_count_metric("Supportability/Logging/Forwarding/Seen", log.num_seen)
-                            # internal_count_metric("Supportability/Logging/Forwarding/Sent", log.num_samples)
+                            internal_count_metric("Supportability/Logging/Forwarding/Seen", logs.num_seen)
+                            internal_count_metric("Supportability/Logging/Forwarding/Sent", logs.num_samples)
+                            internal_count_metric("Logging/Forwarding/Dropped", logs.num_seen - logs.num_samples)
 
                             stats.reset_log_events()
 
