@@ -32,6 +32,8 @@ _default_settings = {
     "debug.record_transaction_failure": True,
     "application_logging.enabled": True,
     "application_logging.forwarding.enabled": True,
+    "application_logging.metrics.enabled": True,
+    "application_logging.local_decorating.enabled": True,
 }
 
 collector_agent_registration = collector_agent_registration_fixture(

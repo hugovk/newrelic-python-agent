@@ -39,13 +39,14 @@ def validate_log_event_count_outside_transaction(count=1):
 
         _new_wrapper = _validate_log_event_count_outside_transaction(wrapped)
         val = _new_wrapper(*args, **kwargs)
-        assert record_called
+        if count:
+            assert record_called
         logs = recorded_logs.copy()
         
         record_called[:] = []
         recorded_logs[:] = []
 
-        assert count == len(logs), (len(logs), logs)
+        assert count == len(logs), len(logs)
 
         return val
 
