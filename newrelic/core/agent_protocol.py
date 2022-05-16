@@ -143,6 +143,7 @@ class AgentProtocol(object):
         "transaction_tracer.record_sql",
         "strip_exception_messages.enabled",
         "custom_insights_events.enabled",
+        "application_logging.forwarding.enabled",
     )
 
     LOGGER_FUNC_MAPPING = {
@@ -280,6 +281,10 @@ class AgentProtocol(object):
         security_settings["transaction_tracer"] = {}
         security_settings["transaction_tracer"]["record_sql"] = settings["transaction_tracer.record_sql"]
 
+        application_logging_max_samples_stored = settings["application_logging.forwarding.max_samples_stored"]
+        event_harvest_config_settings = settings["event_harvest_config"]
+        event_harvest_config_settings["harvest_limits"]["log_event_data"] = application_logging_max_samples_stored
+
         utilization_settings = {}
         # metadata_version corresponds to the utilization spec being used.
         utilization_settings["metadata_version"] = 5
@@ -359,7 +364,7 @@ class AgentProtocol(object):
                 "security_settings": security_settings,
                 "utilization": utilization_settings,
                 "high_security": settings["high_security"],
-                "event_harvest_config": settings["event_harvest_config"],
+                "event_harvest_config": event_harvest_config_settings,
                 "labels": settings["labels"],
                 "display_host": display_host,
             },

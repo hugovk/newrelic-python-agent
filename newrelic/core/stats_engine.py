@@ -1441,7 +1441,7 @@ class StatsEngine(object):
 
     def reset_log_events(self):
         if self.__settings is not None:
-            self._log_events = SampledDataSet(self.__settings.application_logging.forwarding.max_samples_stored)
+            self._log_events = SampledDataSet(self.__settings.event_harvest_config.harvest_limits.log_event_data)
         else:
             self._log_events = SampledDataSet()
 

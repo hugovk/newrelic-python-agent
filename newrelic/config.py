@@ -867,6 +867,10 @@ def apply_local_high_security_mode_setting(settings):
         settings.message_tracer.segment_parameters_enabled = False
         _logger.info(log_template, "message_tracer.segment_parameters_enabled", True, False)
 
+    if settings.application_logging.forwarding.enabled:
+        settings.application_logging.forwarding.enabled = False
+        _logger.info(log_template, "application_logging.forwarding.enabled", True, False)
+
     return settings
 
 
@@ -2919,13 +2923,9 @@ def _process_module_entry_points():
 
 def _process_logging_configuration():
     import newrelic.hooks.internal_logging as hook
-    from newrelic.api.log import NewRelicLogForwardingHandler
     import logging
 
     hook.instrument_cpython_Lib_logging_init(logging)
-
-    root_logger = logging.getLogger()
-    root_logger.addHandler(NewRelicLogForwardingHandler())
 
 _instrumentation_done = False
 

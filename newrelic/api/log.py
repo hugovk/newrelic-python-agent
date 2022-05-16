@@ -86,13 +86,6 @@ class NewRelicContextFormatter(Formatter):
 
 
 class NewRelicLogForwardingHandler(logging.Handler):
-    @property
-    def settings(self):
-        transaction = current_transaction()
-        if transaction:
-            return transaction.settings
-        return global_settings()
-
     def emit(self, record):
         try:
             # Avoid getting local log decorated message

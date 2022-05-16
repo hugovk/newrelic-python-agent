@@ -330,7 +330,7 @@ class Transaction(object):
 
         if self._settings:
             self._custom_events = SampledDataSet(capacity=self._settings.event_harvest_config.harvest_limits.custom_event_data)
-            self._log_events = SampledDataSet(capacity=self._settings.application_logging.forwarding.max_samples_stored)
+            self._log_events = SampledDataSet(capacity=self._settings.event_harvest_config.harvest_limits.log_event_data)
         else:
             self._custom_events = SampledDataSet(capacity=DEFAULT_RESERVOIR_SIZE)
             self._log_events = SampledDataSet(capacity=LOG_EVENT_RESERVOIR_SIZE)
