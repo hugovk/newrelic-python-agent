@@ -527,7 +527,7 @@ def _process_configuration(section):
     _process_setting(section, "event_harvest_config.harvest_limits.custom_event_data", "getint", None)
     _process_setting(section, "event_harvest_config.harvest_limits.span_event_data", "getint", None)
     _process_setting(section, "event_harvest_config.harvest_limits.error_event_data", "getint", None)
-    _process_setting(section, "application_logging.forwarding.max_samples_stored", "getint", None)
+    _process_setting(section, "event_harvest_config.harvest_limits.log_event_data", "getint", None)
     _process_setting(section, "infinite_tracing.trace_observer_host", "get", None)
     _process_setting(section, "infinite_tracing.trace_observer_port", "getint", None)
     _process_setting(section, "infinite_tracing.span_queue_size", "getint", None)
@@ -713,6 +713,10 @@ def translate_deprecated_settings(settings, cached_settings):
         (
             "custom_insights_events.max_samples_stored",
             "event_harvest_config.harvest_limits.custom_event_data",
+        ),
+        (
+            "application_logging.forwarding.max_samples_stored",
+            "event_harvest_config.harvest_limits.log_event_data",
         ),
         (
             "error_collector.ignore_errors",
