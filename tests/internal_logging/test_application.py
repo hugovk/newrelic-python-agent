@@ -31,6 +31,7 @@ from testing_support.fixtures import (
     validate_transaction_errors,
     validate_transaction_metrics,
 )
+from tests.agent_unittests.test_agent_protocol import HIGH_SECURITY
 from tests.testing_support.fixtures import validate_internal_metrics
 
 
@@ -248,6 +249,18 @@ def test_settings():
     
     assert int(gs.event_harvest_config.harvest_limits.log_event_data / 12) == app_settings.event_harvest_config.harvest_limits.log_event_data
 
+@reset_core_stats_engine()
+@override_application_settings({'high_security': True})
+def test_HSM_forwarding_disabled(logger):
+    @validate_log_event_count(0)
+    @background_task()
+    def test():
+        nr_logger = logging.getLogger("newrelic")
+        nr_logger.addHandler(logger.caplog)
+        nr_logger.warning("A")  #if HSM is on, this should not be forwarded
+        assert len(logger.caplog.records) == 1
+
+    test()
 
 # _test_log_sampling_unscoped_metrics = [
 #     ("Logging/lines", 900),
