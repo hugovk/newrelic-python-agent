@@ -537,6 +537,10 @@ class Application(object):
             )
             internal_metric("Supportability/Python/Application/Registration/Attempts", connect_attempts)
             # TODO All settings related supportability metrics go here for logging
+            #internal_metric("Supportability/Logging/Python/{}/enabled" % {framework}) # if instrumentation is installed
+            #internal_metric("Supportability/Logging/Metrics/Python/enabled")       # at connect (not harvest)
+            #internal_metric("Supportability/Logging/Forwarding/Python/enabled")    # at connect (not harvest)
+            #internal_metric("Supportability/Logging/LocalDecorating/Python/enabled")   # at connect (not harvest)
 
         self._stats_engine.merge_custom_metrics(internal_metrics.metrics())
 
