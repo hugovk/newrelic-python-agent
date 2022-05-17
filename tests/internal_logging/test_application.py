@@ -140,7 +140,6 @@ def test_record_log_event_unknown_level_outside_transaction():
     test()
 
 
-
 @reset_core_stats_engine()
 def test_record_log_event_empty_message_inside_transaction():
     @validate_log_event_count(0)
@@ -150,6 +149,17 @@ def test_record_log_event_empty_message_inside_transaction():
     
     test()
 
+
+@reset_core_stats_engine()
+def test_record_log_event_whitespace_inside_transaction():
+    @validate_log_event_count(0)
+    @background_task()
+    def test():
+        exercise_record_log_event("         ")
+
+    test()
+
+
 @reset_core_stats_engine()
 def test_record_log_event_empty_message_outside_transaction():
     @validate_log_event_count_outside_transaction(0)
@@ -158,6 +168,13 @@ def test_record_log_event_empty_message_outside_transaction():
 
     test()
 
+@reset_core_stats_engine()
+def test_record_log_event_whitespace_outside_transaction():
+    @validate_log_event_count_outside_transaction(0)
+    def test():
+        exercise_record_log_event("         ")
+
+    test()
 
 
 _test_logging_unscoped_metrics = [
@@ -171,6 +188,7 @@ _test_logging_inside_transaction_events = [
     {"message": "D", "level": "ERROR", **_common_attributes_trace_linking},
     {"message": "E", "level": "CRITICAL", **_common_attributes_trace_linking},   
 ]
+
 
 @reset_core_stats_engine()
 def test_logging_inside_transaction(logger):
@@ -218,6 +236,7 @@ def test_logging_newrelic_logs_not_forwarded(logger):
 
     test()
 
+
 @reset_core_stats_engine()
 def test_ignored_transaction_logs_not_forwarded():
     @validate_log_event_count(0)
@@ -241,6 +260,7 @@ def test_log_event_truncation():
 
     test()
 
+
 def test_settings():
     from newrelic.core.config import global_settings
     from newrelic.api.application import application_instance
@@ -248,6 +268,7 @@ def test_settings():
     app_settings = application_instance().settings
     
     assert int(gs.event_harvest_config.harvest_limits.log_event_data / 12) == app_settings.event_harvest_config.harvest_limits.log_event_data
+
 
 @reset_core_stats_engine()
 @override_application_settings({'high_security': True})

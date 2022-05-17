@@ -88,7 +88,7 @@ PARENT_TYPE = {
 
 
 # FIXME REMOVE THIS
-_log_records = []
+#_log_records = []
 
 
 class Sentinel(TimeTrace):
@@ -1486,7 +1486,7 @@ class Transaction(object):
         timestamp = timestamp if timestamp is not None else time.time()
         level = str(level) if level is not None else "UNKNOWN"
 
-        if not message:
+        if not message or message.isspace():
             _logger.debug("record_log_event called where message was missing. No log event will be sent.")
             return
 
@@ -1504,7 +1504,7 @@ class Transaction(object):
         timestamp = timestamp if timestamp is not None else time.time()
         level = str(level) if level is not None else "UNKNOWN"
         
-        if not message:
+        if not message or message.isspace():
             _logger.debug("record_log_event called where message was missing. No log event will be sent.")
             return
         
