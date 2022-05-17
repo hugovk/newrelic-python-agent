@@ -239,7 +239,15 @@ def test_log_event_truncation():
         exercise_record_log_event("A" * 33000)
 
     test()
+
+def test_settings():
+    from newrelic.core.config import global_settings
+    from newrelic.api.application import application_instance
+    gs = global_settings()
+    app_settings = application_instance().settings
     
+    assert int(gs.event_harvest_config.harvest_limits.log_event_data / 12) == app_settings.event_harvest_config.harvest_limits.log_event_data
+
 
 # _test_log_sampling_unscoped_metrics = [
 #     ("Logging/lines", 900),

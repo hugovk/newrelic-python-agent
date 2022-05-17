@@ -536,6 +536,7 @@ class Application(object):
                 "Supportability/Python/Application/Registration/Duration", self._period_start - connect_start
             )
             internal_metric("Supportability/Python/Application/Registration/Attempts", connect_attempts)
+            # TODO All settings related supportability metrics go here for logging
 
         self._stats_engine.merge_custom_metrics(internal_metrics.metrics())
 
