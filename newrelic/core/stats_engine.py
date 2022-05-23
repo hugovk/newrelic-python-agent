@@ -199,9 +199,6 @@ class CustomMetrics(object):
         from prior value metrics with the same name.
 
         """
-        # if "Logging/li" in name:
-        #     breakpoint()
-        #     pass
         if isinstance(value, dict):
             if len(value) == 1 and "count" in value:
                 new_stats = CountStats(call_count=value["count"])

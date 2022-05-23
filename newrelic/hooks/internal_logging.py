@@ -72,7 +72,7 @@ def wrap_callHandlers(wrapped, instance, args, kwargs):
                 if application and application.enabled:
                     application.record_custom_metric("Logging/lines", {"count": 1})
                     application.record_custom_metric("Logging/lines/%s" % level_name, {"count": 1})
-    
+            
         if settings.application_logging.forwarding and settings.application_logging.forwarding.enabled:
             try:
                 message = record.getMessage()

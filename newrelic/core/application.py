@@ -536,11 +536,15 @@ class Application(object):
                 "Supportability/Python/Application/Registration/Duration", self._period_start - connect_start
             )
             internal_metric("Supportability/Python/Application/Registration/Attempts", connect_attempts)
-            # TODO All settings related supportability metrics go here for logging
+
+            # Logging feature toggle metrics 
             #internal_metric("Supportability/Logging/Python/{}/enabled" % {framework}) # if instrumentation is installed
-            internal_metric("Supportability/Logging/Metrics/Python/enabled", configuration.application_logging.enabled)       # at connect (not harvest)
-            internal_metric("Supportability/Logging/Forwarding/Python/enabled", configuration.application_logging.forwarding.enabled)    # at connect (not harvest)
-            #internal_metric("Supportability/Logging/LocalDecorating/Python/enabled")   # at connect (not harvest)
+            application_logging_metrics = configuration.application_logging.enabled and configuration.application_logging.metrics.enabled
+            application_logging_forwarding = configuration.application_logging.enabled and configuration.application_logging.forwarding.enabled
+            application_logging_local_decorating = configuration.application_logging.enabled and configuration.application_logging.local_decorating.enabled
+            internal_metric("Supportability/Logging/Forwarding/Python/%s" % ("enabled" if application_logging_forwarding else "disabled"), 1)
+            internal_metric("Supportability/Logging/LocalDecorating/Python/%s" % ("enabled" if application_logging_local_decorating else "disabled"), 1)
+            internal_metric("Supportability/Logging/Metrics/Python/%s" % ("enabled" if application_logging_metrics else "disabled"), 1)
 
         self._stats_engine.merge_custom_metrics(internal_metrics.metrics())
 

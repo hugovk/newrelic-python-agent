@@ -15,7 +15,9 @@
 import logging
 import sys
 import pytest
+import platform
 
+from newrelic.api.application import application_settings
 from newrelic.api.background_task import background_task
 from newrelic.api.time_trace import current_trace
 from newrelic.api.transaction import current_transaction, record_log_event, ignore_transaction
@@ -25,7 +27,6 @@ from testing_support.validators.validate_log_event_count import validate_log_eve
 from testing_support.validators.validate_log_event_count_outside_transaction import validate_log_event_count_outside_transaction
 from testing_support.validators.validate_log_events import validate_log_events
 from testing_support.validators.validate_log_events_outside_transaction import validate_log_events_outside_transaction
-
 from testing_support.fixtures import (
     override_application_settings,
     validate_transaction_errors,
@@ -198,7 +199,7 @@ _test_logging_inside_transaction_events = [
 def test_logging_inside_transaction(logger):
     @validate_transaction_metrics(
         "test_application:test_logging_inside_transaction.<locals>.test",
-        rollup_metrics=_test_logging_unscoped_metrics,
+        custom_metrics=_test_logging_unscoped_metrics,
         background_task=True,
     )
     @validate_log_events(_test_logging_inside_transaction_events)
@@ -265,35 +266,82 @@ def test_log_event_truncation():
     test()
 
 
-def test_settings():
-    from newrelic.core.config import global_settings
-    from newrelic.api.application import application_instance
-    gs = global_settings()
-    app_settings = application_instance().settings
-    
-    assert int(gs.event_harvest_config.harvest_limits.log_event_data / 12) == app_settings.event_harvest_config.harvest_limits.log_event_data
+_settings_matrix = [
+    (True, True, True),
+    (True, False, False),
+    (False, True, False),
+    (False, False, False),
+]
 
 
+@pytest.mark.parametrize("feature_setting,subfeature_setting,expected", _settings_matrix)
 @reset_core_stats_engine()
-@override_application_settings({'high_security': True})
-def test_HSM_forwarding_disabled(logger):
-    @validate_log_event_count(0)
+def test_log_forwarding_settings(logger, feature_setting, subfeature_setting, expected):
+    @override_application_settings({
+        "application_logging.enabled": feature_setting,
+        "application_logging.forwarding.enabled": subfeature_setting,
+    })
+    @validate_log_event_count(1 if expected else 0)
     @background_task()
     def test():
-        nr_logger = logging.getLogger("newrelic")
-        nr_logger.addHandler(logger.caplog)
-        nr_logger.warning("A")  #if HSM is on, this should not be forwarded
+        basic_logging(logger)
         assert len(logger.caplog.records) == 1
 
     test()
 
 
+@pytest.mark.parametrize("feature_setting,subfeature_setting,expected", _settings_matrix)
+@reset_core_stats_engine()
+def test_local_log_decoration_settings(logger, feature_setting, subfeature_setting, expected):
+    @override_application_settings({
+        "application_logging.enabled": feature_setting,
+        "application_logging.local_decorating.enabled": subfeature_setting,
+    })
+    @background_task()
+    def test():
+        basic_logging(logger)
+        assert len(logger.caplog.records) == 1
+        message = logger.caplog.records.pop()
+        if expected:
+            assert len(message) > 1
+        else:
+            assert len(message) == 1
+
+    test()
+
+
+@pytest.mark.parametrize("feature_setting,subfeature_setting,expected", _settings_matrix)
+@reset_core_stats_engine()
+def test_log_metrics_settings(logger, feature_setting, subfeature_setting, expected):
+    metric_count = 1 if expected else None
+    @override_application_settings({
+        "application_logging.enabled": feature_setting,
+        "application_logging.metrics.enabled": subfeature_setting,
+    })
+    @validate_transaction_metrics(
+        "test_application:test_log_metrics_settings.<locals>.test",
+        custom_metrics=[
+            ("Logging/lines", metric_count),
+            ("Logging/lines/WARNING", metric_count),
+        ],
+        background_task=True,
+    )
+    @background_task()
+    def test():
+        basic_logging(logger)
+        assert len(logger.caplog.records) == 1
+
+    test()
+
 
 def get_metadata_string(log_message, is_txn):
+    host = platform.uname().node
+    assert host
+    entity_guid = application_settings().entity_guid
     if is_txn:
-        metadata_string = 'NR-LINKING|MTA2NTMzNDB8QVBNfEFQUExJQ0FUSU9OfDE3MjY2MTAx|C02CK09DMD6P|abcdefgh12345678|abcdefgh|Python%20Agent%20Test%20%28internal_logging%29|'
+        metadata_string = "".join(('NR-LINKING|', entity_guid, '|', host, '|abcdefgh12345678|abcdefgh|Python%20Agent%20Test%20%28internal_logging%29|'))
     else:
-        metadata_string = 'NR-LINKING|MTA2NTMzNDB8QVBNfEFQUExJQ0FUSU9OfDE3MjY2MTAx|C02CK09DMD6P|||Python%20Agent%20Test%20%28internal_logging%29|'
+        metadata_string = "".join(('NR-LINKING|', entity_guid, '|', host, '|||Python%20Agent%20Test%20%28internal_logging%29|'))
     formatted_string = log_message + " " + metadata_string
     return formatted_string
 
@@ -344,7 +392,7 @@ def test_local_log_decoration_disabled(logger):
 # def test_logs_dropped_inside_transaction(logger):
 #     @validate_transaction_metrics(
 #         "test_application:test_logs_dropped_inside_transaction.<locals>.test",
-#         rollup_metrics=_test_log_sampling_unscoped_metrics,
+#         custom_metrics=_test_log_sampling_unscoped_metrics,
 #         background_task=True,
 #     )
 #     @validate_internal_metrics([("Logging/Forwarding/Dropped", 67)])
