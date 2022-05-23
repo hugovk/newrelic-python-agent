@@ -31,8 +31,8 @@ from testing_support.fixtures import (
     validate_transaction_errors,
     validate_transaction_metrics,
 )
-from tests.agent_unittests.test_agent_protocol import HIGH_SECURITY
-from tests.testing_support.fixtures import validate_internal_metrics
+#from tests.agent_unittests.test_agent_protocol import HIGH_SECURITY
+from testing_support.fixtures import validate_internal_metrics
 
 
 class CaplogHandler(logging.StreamHandler):
@@ -68,6 +68,10 @@ def set_trace_ids():
     if trace:
         trace.guid = "abcdefgh"
 
+def basic_logging(logger):
+    set_trace_ids()
+
+    logger.warning("C")
 
 def exercise_logging(logger):
     set_trace_ids()
@@ -202,7 +206,7 @@ def test_logging_inside_transaction(logger):
     @background_task()
     def test():
         exercise_logging(logger)
-    
+
     test()
 
 
@@ -282,6 +286,54 @@ def test_HSM_forwarding_disabled(logger):
         assert len(logger.caplog.records) == 1
 
     test()
+
+
+
+def get_metadata_string(log_message, is_txn):
+    if is_txn:
+        metadata_string = 'NR-LINKING|MTA2NTMzNDB8QVBNfEFQUExJQ0FUSU9OfDE3MjY2MTAx|C02CK09DMD6P|abcdefgh12345678|abcdefgh|Python%20Agent%20Test%20%28internal_logging%29|'
+    else:
+        metadata_string = 'NR-LINKING|MTA2NTMzNDB8QVBNfEFQUExJQ0FUSU9OfDE3MjY2MTAx|C02CK09DMD6P|||Python%20Agent%20Test%20%28internal_logging%29|'
+    formatted_string = log_message + " " + metadata_string
+    return formatted_string
+
+
+@reset_core_stats_engine()
+def test_local_log_decoration_inside_transaction(logger):
+    @validate_transaction_metrics(
+        "test_application:test_local_log_decoration_inside_transaction.<locals>.test",
+        background_task=True,
+    )
+    @validate_log_event_count(1)
+    @background_task()
+    def test():
+        basic_logging(logger)
+        assert logger.caplog.records[0] == get_metadata_string('C', True)
+
+    test()
+
+
+@reset_core_stats_engine()
+def test_local_log_decoration_outside_transaction(logger):
+    @validate_log_event_count_outside_transaction(1)
+    def test():
+        basic_logging(logger)
+        assert logger.caplog.records[0] == get_metadata_string('C', False)
+
+    test()
+
+
+@reset_core_stats_engine()
+@override_application_settings({'application_logging.local_decorating.enabled': False})
+def test_local_log_decoration_disabled(logger):
+    @validate_log_event_count(1)
+    @background_task()
+    def test():
+        basic_logging(logger)
+        assert logger.caplog.records[0] == 'C'
+
+    test()
+
 
 # _test_log_sampling_unscoped_metrics = [
 #     ("Logging/lines", 900),
