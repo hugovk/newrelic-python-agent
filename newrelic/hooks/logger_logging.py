@@ -62,8 +62,8 @@ def wrap_callHandlers(wrapped, instance, args, kwargs):
 
     # Return early if application logging not enabled
     if settings and settings.application_logging and settings.application_logging.enabled:
+        level_name = str(getattr(record, "levelname", "UNKNOWN"))
         if settings.application_logging.metrics and settings.application_logging.metrics.enabled:
-            level_name = str(getattr(record, "levelname", "UNKNOWN"))
             if transaction:
                 transaction.record_custom_metric("Logging/lines", {"count": 1})
                 transaction.record_custom_metric("Logging/lines/%s" % level_name, {"count": 1})
@@ -76,7 +76,7 @@ def wrap_callHandlers(wrapped, instance, args, kwargs):
         if settings.application_logging.forwarding and settings.application_logging.forwarding.enabled:
             try:
                 message = record.getMessage()
-                record_log_event(message, record.levelname, int(record.created * 1000))
+                record_log_event(message, level_name, int(record.created * 1000))
             except Exception:
                 pass
 
@@ -87,7 +87,7 @@ def wrap_callHandlers(wrapped, instance, args, kwargs):
     return wrapped(*args, **kwargs)
 
 
-def instrument_cpython_Lib_logging_init(module):
+def instrument_logging(module):
     if hasattr(module, "Logger"):
         if hasattr(module.Logger, "callHandlers"):
             wrap_function_wrapper(module, "Logger.callHandlers", wrap_callHandlers)

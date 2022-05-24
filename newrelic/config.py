@@ -2309,8 +2309,8 @@ def _process_module_builtin_defaults():
 
     _process_module_definition(
         "logging",
-        "newrelic.hooks.internal_logging",
-        "instrument_cpython_Lib_logging_init",
+        "newrelic.hooks.logger_logging",
+        "instrument_logging",
     )
 
     _process_module_definition(
