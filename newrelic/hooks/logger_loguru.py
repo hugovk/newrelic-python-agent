@@ -12,11 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from newrelic.api.application import application_instance
 from newrelic.api.transaction import current_transaction, record_log_event
 from newrelic.common.object_wrapper import wrap_function_wrapper
 from newrelic.core.config import global_settings
 from newrelic.hooks.logger_logging import add_nr_linking_metadata
+
+_logger = logging.getLogger(__name__) 
+
+def loguru_version():
+    from loguru import __version__
+    return tuple(int(x) for x in __version__.split("."))
 
 
 def _nr_log_forwarder(message_instance):
@@ -51,10 +59,25 @@ def _nr_log_forwarder(message_instance):
                 pass
 
 
-@property
-def patcher(self):
-    original_patcher = getattr(self, "_nr_patcher", None)
-    def _patcher(record):
+def bind_log(level_id, static_level_no, from_decorator, options, message, args, kwargs):
+    assert len(options) == 9  # Assert the options signature we expect
+    return level_id, static_level_no, from_decorator, list(options), message, args, kwargs
+
+
+def wrap_log(wrapped, instance, args, kwargs):
+    try:
+        level_id, static_level_no, from_decorator, options, message, subargs, subkwargs = bind_log(*args, **kwargs)
+        options[-2] = nr_log_patcher(options[-2])
+    except Exception as e:
+        breakpoint()
+        _logger.debug("Exception in loguru handling: %s" % str(e))
+        return wrapped(*args, **kwargs)
+    else:
+        return wrapped(level_id, static_level_no, from_decorator, options, message, subargs, subkwargs)
+
+
+def nr_log_patcher(original_patcher=None):
+    def _nr_log_patcher(record):
         if original_patcher:
             record = original_patcher(record)
         
@@ -70,12 +93,18 @@ def patcher(self):
                 record["_nr_original_message"] = message = record["message"]
                 record["message"] = add_nr_linking_metadata(message)
 
-    return _patcher
+    if loguru_version() > (0, 6, 0):
+        if original_patcher is not None:
+            patchers = [p for p in original_patcher]  # Consumer iterable into list so we can modify
+            # Wipe out reference so patchers aren't called twice, as the framework will handle calling other patchers.
+            original_patcher = None
+        else:
+            patchers = []
 
-
-@patcher.setter
-def patcher(self, value):
-    self._nr_patcher = value
+        patchers.append(_nr_log_patcher)
+        return patchers
+    else:
+        return _nr_log_patcher
 
 
 def wrap_Logger_init(wrapped, instance, args, kwargs):
@@ -88,15 +117,14 @@ def patch_loguru_logger(logger):
     if hasattr(logger, "_core") and not hasattr(logger._core, "_nr_instrumented"):
         core = logger._core
         logger.add(_nr_log_forwarder)
-        original_patcher = core.patcher
-        core.__class__.patcher = patcher
-        core.patcher = original_patcher  # Add the original patcher back in using the setter
         logger._core._nr_instrumented = True
 
 
 def instrument_loguru_logger(module):
     if hasattr(module, "Logger"):
         wrap_function_wrapper(module, "Logger.__init__", wrap_Logger_init)
+        if hasattr(module.Logger, "_log"):
+            wrap_function_wrapper(module, "Logger._log", wrap_log)
 
 
 def instrument_loguru(module):
