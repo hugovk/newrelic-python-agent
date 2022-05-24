@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+import pytest
+
 from testing_support.fixtures import (
     code_coverage_fixture,
     collector_agent_registration_fixture,
@@ -41,3 +44,28 @@ collector_agent_registration = collector_agent_registration_fixture(
     app_name="Python Agent Test (internal_logging)",
     default_settings=_default_settings,
 )
+
+
+class CaplogHandler(logging.StreamHandler):
+    """
+    To prevent possible issues with pytest's monkey patching
+    use a custom Caplog handler to capture all records
+    """
+    def __init__(self, *args, **kwargs):
+        self.records = []
+        super(CaplogHandler, self).__init__(*args, **kwargs)
+
+    def emit(self, record):
+        self.records.append(self.format(record))
+
+
+@pytest.fixture(scope="function")
+def logger():
+    _logger = logging.getLogger("my_app")
+    caplog = CaplogHandler()
+    _logger.addHandler(caplog)
+    _logger.caplog = caplog
+    _logger.setLevel(logging.WARNING)
+    yield _logger
+    del caplog.records[:]
+    _logger.removeHandler(caplog)
