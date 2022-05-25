@@ -69,7 +69,6 @@ def wrap_log(wrapped, instance, args, kwargs):
         level_id, static_level_no, from_decorator, options, message, subargs, subkwargs = bind_log(*args, **kwargs)
         options[-2] = nr_log_patcher(options[-2])
     except Exception as e:
-        breakpoint()
         _logger.debug("Exception in loguru handling: %s" % str(e))
         return wrapped(*args, **kwargs)
     else:
@@ -116,7 +115,7 @@ def wrap_Logger_init(wrapped, instance, args, kwargs):
 def patch_loguru_logger(logger):
     if hasattr(logger, "_core") and not hasattr(logger._core, "_nr_instrumented"):
         core = logger._core
-        logger.add(_nr_log_forwarder)
+        logger.add(_nr_log_forwarder, format="{message}")
         logger._core._nr_instrumented = True
 
 
