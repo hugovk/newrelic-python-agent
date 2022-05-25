@@ -94,7 +94,7 @@ def test_log_metrics_settings(logger, feature_setting, subfeature_setting, expec
         "application_logging.metrics.enabled": subfeature_setting,
     })
     @validate_transaction_metrics(
-        "test_application:test_log_metrics_settings.<locals>.test",
+        "test_settings:test_log_metrics_settings.<locals>.test",
         custom_metrics=[
             ("Logging/lines", metric_count),
             ("Logging/lines/WARNING", metric_count),

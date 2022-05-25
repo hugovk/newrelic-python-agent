@@ -18,14 +18,14 @@ from testing_support.fixtures import catch_background_exceptions
 from newrelic.common.object_wrapper import transient_function_wrapper, function_wrapper
 
 
-def validate_custom_metrics_outside_transaction(custom_metrics=None, index=-1):
+def validate_custom_metrics_outside_transaction(custom_metrics=None):
     custom_metrics = custom_metrics or []
 
     @function_wrapper
     def _validate_wrapper(wrapped, instance, args, kwargs):
 
         record_custom_metric_called = []
-        recorded_metrics = []
+        recorded_metrics = [None]
 
         @transient_function_wrapper("newrelic.core.stats_engine", "StatsEngine.record_custom_metric")
         @catch_background_exceptions
@@ -42,7 +42,7 @@ def validate_custom_metrics_outside_transaction(custom_metrics=None, index=-1):
                 _metrics = {}
                 for k, v in metrics.items():
                     _metrics[k] = copy.copy(v)
-                recorded_metrics.append(_metrics)
+                recorded_metrics[0] = _metrics
 
             return result
 
@@ -78,7 +78,7 @@ def validate_custom_metrics_outside_transaction(custom_metrics=None, index=-1):
         _new_wrapper = _validate_custom_metrics_outside_transaction(wrapped)
         val = _new_wrapper(*args, **kwargs)
         assert record_custom_metric_called
-        metrics = recorded_metrics[index]
+        metrics = recorded_metrics[0]
 
         record_custom_metric_called[:] = []
         recorded_metrics[:] = []

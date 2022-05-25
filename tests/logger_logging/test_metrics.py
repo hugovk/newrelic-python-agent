@@ -40,7 +40,7 @@ _test_logging_unscoped_metrics = [
 @reset_core_stats_engine()
 def test_logging_metrics_inside_transaction(logger):
     @validate_transaction_metrics(
-        "test_application:test_logging_metrics_inside_transaction.<locals>.test",
+        "test_metrics:test_logging_metrics_inside_transaction.<locals>.test",
         custom_metrics=_test_logging_unscoped_metrics,
         background_task=True,
     )

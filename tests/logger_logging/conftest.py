@@ -22,7 +22,7 @@ from testing_support.fixtures import (
 )
 
 _coverage_source = [
-    "newrelic.hooks.internal_logging",
+    "newrelic.hooks.logger_logging",
 ]
 
 code_coverage = code_coverage_fixture(source=_coverage_source)
@@ -41,7 +41,7 @@ _default_settings = {
 }
 
 collector_agent_registration = collector_agent_registration_fixture(
-    app_name="Python Agent Test (internal_logging)",
+    app_name="Python Agent Test (logger_logging)",
     default_settings=_default_settings,
 )
 

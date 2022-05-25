@@ -44,7 +44,7 @@ def exercise_logging(logger):
     assert len(logger.caplog.records) == 3
 
 
-_common_attributes_service_linking = {"timestamp": None, "hostname": None, "entity.name": "Python Agent Test (internal_logging)", "entity.guid": None}
+_common_attributes_service_linking = {"timestamp": None, "hostname": None, "entity.name": "Python Agent Test (logger_logging)", "entity.guid": None}
 _common_attributes_trace_linking = {"span.id": "abcdefgh", "trace.id": "abcdefgh12345678", **_common_attributes_service_linking}
 
 _test_logging_inside_transaction_events = [
